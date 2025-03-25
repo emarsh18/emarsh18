@@ -1,0 +1,433 @@
+---
+title: "Final Project"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r reading in code and libraries, include=FALSE}
+library(tidyverse)
+library(psych)
+library(skimr)
+library(effectsize)
+library(rstatix)
+library(naniar)
+
+initalDataSet <- read.csv("~/Desktop/CBSC-185/Final Project/Daily Survey Raw Data.csv", header = TRUE)
+initalIndiffSurv <- read.csv("~/Desktop/CBSC-185/Final Project/W2024_CBSC185_Ind Diff For Class.csv", header = TRUE)
+```
+## Research Proposal, Setup and Hypotheses 
+
+>> Stress is one of the most common feelings causing anxiety on college campuses. While many things cause stress, I am curious as to what backgrounds cause students to endure more stress over the semester and during exam weeks. In my long term data anaylisis, I examined the student stress levels depending on their type of high schooling and their majors. 
+
+>> I anticipate that students who attended public high school will experience more stress overall and during exam week because the enviroment differs greatly from W&L. I also think that STEM majors will endure the most stress during exam weeks because most STEM classes are test heavy during the week of finals whereas humanities and business majors tend to complete more projects and essays. 
+
+>> To begin by project, I did some extensive data wrangling and then graphed my data and completed my anova modeling. 
+
+```{r wrangling data}
+
+#Note: Q47_1 is the stress level 
+dailysubset<-select(initalDataSet,RecordedDate,ID, Q47_1) #selecting the data from the daily class survey dataset
+indiffsubset<- select(initalIndiffSurv, ID, TypeofSchool, Major_Type) #selecting the principle variables that we need from the indifference survey
+
+#removing the first row of the indifference data frame because it only contains labels
+indiffsubset <- indiffsubset[-c(1), ]
+
+#removing the timing from the recorded date column 
+dailysubset <- separate(dailysubset, col = RecordedDate, into = c("Date", "Time"), sep = " ") #separates the column into data and time
+dailysubset <- select(dailysubset, Date, ID, Q47_1) #removes the time column by selecting the Date only
+
+#removing the NA values 
+dailysubset$Q47_1[dailysubset$Q47_1 == ""] <- NA #fills in the missing values with NA
+dailysubset <- drop_na(dailysubset, Q47_1) #now we can apply the drop NA function to get rid of the NA values in the stress column
+
+#removing the first row because it only contains lablels
+dailysubset <- dailysubset[-c(1), ]
+
+#changing the Q47_1 (stress) to an integer
+dailysubset <- mutate(dailysubset, Q47_1 = as.integer(Q47_1), Date = as_factor(Date), ID = as_factor(ID))
+
+#remove row 111 because student 8 submitted two responses
+dailysubset <- dailysubset[-c(111), ]
+```
+
+
+```{r Cleaning Data Set, warning = FALSE}
+#making the data frame wide so that we have dates as the columns 
+dailysubsetWide <- pivot_wider(dailysubset, names_from = Date, values_from = Q47_1)
+
+#changing col names to be more intuitive 
+colnames(dailysubsetWide) <- c('ID','Jan_23','Jan_25', "Jan_30", "Feb_1", "Feb_6", "Feb_8", "Feb_13", "Feb_15", "Feb_20", "Feb_22", "Mar_5", "Mar_12", "Mar_14", "Mar_21", "Mar_7", "Mar_19", "Mar_26") 
+
+#marking Null values as NA
+dailysubsetWide$Jan_23[dailysubsetWide$Jan_23 == "NULL"] <- NA
+dailysubsetWide$Jan_25[dailysubsetWide$Jan_25 == "NULL"] <- NA
+dailysubsetWide$Jan_30[dailysubsetWide$Jan_30 == "NULL"] <- NA
+dailysubsetWide$Feb_1[dailysubsetWide$Feb_1 == "NULL"] <- NA
+dailysubsetWide$Feb_6[dailysubsetWide$Feb_6 == "NULL"] <- NA
+dailysubsetWide$Feb_8[dailysubsetWide$Feb_8 == "NULL"] <- NA
+dailysubsetWide$Feb_13[dailysubsetWide$Feb_13 == "NULL"] <- NA
+dailysubsetWide$Feb_15[dailysubsetWide$Feb_15 == "NULL"] <- NA
+dailysubsetWide$Feb_20[dailysubsetWide$Feb_20 == "NULL"] <- NA
+dailysubsetWide$Feb_22[dailysubsetWide$Feb_22 == "NULL"] <- NA
+dailysubsetWide$Mar_5[dailysubsetWide$Mar_5 == "NULL"] <- NA
+dailysubsetWide$Mar_7[dailysubsetWide$Mar_7 == "NULL"] <- NA
+dailysubsetWide$Mar_12[dailysubsetWide$Mar_12 == "NULL"] <- NA
+dailysubsetWide$Mar_14[dailysubsetWide$Mar_14 == "NULL"] <- NA
+dailysubsetWide$Mar_21[dailysubsetWide$Mar_21 == "NULL"] <- NA
+dailysubsetWide$Mar_19[dailysubsetWide$Mar_19 == "NULL"] <- NA
+
+#dropping the week of 3/26 because there was only one student that entered the information 
+dailysubsetWide <- dailysubsetWide[,c(1:17)]
+
+#changing the dates to int types rather than lists 
+dailysubsetWide <- mutate(dailysubsetWide, Jan_23 = as.integer(Jan_23), Jan_25 = as.integer(Jan_25), Jan_30 = as.integer(Jan_30), Feb_1 = as.integer(Feb_1), Feb_6 = as.integer(Feb_6), Feb_8 = as.integer(Feb_8), Feb_13 = as.integer(Feb_13), Feb_15 = as.integer(Feb_15), Feb_20 = as.integer(Feb_20), Feb_22 = as.integer(Feb_22), Mar_5 = as.integer(Mar_5), Mar_12 = as.integer(Mar_12), Mar_14 = as.integer(Mar_14), Mar_21 = as.integer(Mar_21), Mar_7 = as.integer(Mar_7), Mar_19 = as.integer(Mar_19))
+
+#create new columns that represent the weeks and store the mean of the days in the column 
+dailysubsetWide$Week_1 <- (dailysubsetWide$Jan_23 + dailysubsetWide$Jan_25) / 2
+dailysubsetWide$Week_2 <- (dailysubsetWide$Jan_30 + dailysubsetWide$Feb_1) / 2
+dailysubsetWide$Week_3 <- (dailysubsetWide$Feb_6 + dailysubsetWide$Feb_8) / 2
+dailysubsetWide$Week_4 <- (dailysubsetWide$Feb_13 + dailysubsetWide$Feb_15) / 2
+dailysubsetWide$Week_5 <- (dailysubsetWide$Feb_20 + dailysubsetWide$Feb_22) / 2
+dailysubsetWide$Week_6 <- (dailysubsetWide$Mar_5 + dailysubsetWide$Mar_7) / 2
+dailysubsetWide$Week_7 <- (dailysubsetWide$Mar_12 + dailysubsetWide$Mar_14) / 2
+dailysubsetWide$Week_8 <- (dailysubsetWide$Mar_19 + dailysubsetWide$Mar_21) / 2
+
+#merging the data sets to incorporate major type by ID
+mergedData <- merge(dailysubsetWide,indiffsubset,by="ID")
+
+#filling the empty major types with 'other' so that we don't miss their data
+mergedData$Major_Type[mergedData$Major_Type == ""] <- NA
+mergedData$Major_Type<-mergedData$Major_Type %>% replace_na('Other')
+
+#choosing the columns we want to create the ideal dataset with only information that we need
+mergedDataSubset <- mergedData[,c(1, 18:27)]
+
+#changing Major type to factor
+mergedDataSubset <- mutate(mergedDataSubset, Major_Type = as_factor(Major_Type))
+
+#changing Type of School to the name of school type 
+mergedDataSubset$TypeofSchool[mergedDataSubset$TypeofSchool == ""] <- NA
+mergedDataSubset$TypeofSchool<-mergedDataSubset$TypeofSchool %>% replace_na('Other')
+mergedDataSubset$TypeofSchool <-recode(mergedDataSubset$TypeofSchool, '1' = "Traditional_Public", '2' = "Public_Charter", '3' = "Public_Magnet", '4' = "Private_School", '5' = "Online_Learning", '6' = "Homeschooling", '7' = "Other")
+
+#filling the values that are NA in every column with the average of the column so when we take the mean, it won't affect the outcome and we won't have to drop all NA values 
+calcMean <- function(x) replace(x, is.na(x), mean(x, na.rm = TRUE))
+mergedDataSubset[] <- lapply(mergedDataSubset, calcMean)
+
+#pivot the data to longer format
+mergeLong<- pivot_longer(mergedDataSubset, 
+                                          c('Week_1', 'Week_2',
+                                            'Week_3', 'Week_4',
+                                            'Week_5','Week_6', 'Week_7',
+                                            'Week_8'), 
+                                          names_to = "Week",
+                                          values_to="Stress")
+
+
+#rewrites the waves as numbers so we can plot them temporally
+merge_long_line <- mutate(mergeLong, 
+                                 Week = recode(Week, 'Week_1' = "1", 
+                                              'Week_2' = "2",
+                                              'Week_3' = "3", 
+                                              'Week_4' ="4",
+                                              'Week_5' = "5",'Week_6' = "6", 
+                                              'Week_7' = "7",
+                                              'Week_8' = "8"))
+
+#stating that the wave variable needs to be considered a number
+merge_long_line <- mutate(merge_long_line, Week = as.numeric(Week))
+```
+
+## Notes on Difficult Data Management: 
+ 
+>> During the selection process to make subsets of the larger data sets, the NA values did not transfer. Instead, the cells were empty values rather than marked as NA. To fix this issue, I refilled the empty cells with NA so that I could use the drop_na function. Additionally, I manually calculated the mean because the built-in mean() function was not computing correctly. 
+
+```{r graphing general stress line graph, include = FALSE}
+#creating a line containing the means of each week
+merge_means_line <- merge_long_line %>%
+  group_by(Week) %>%
+  summarise(merge_means = mean(Stress),
+            merge_sds = sd(Stress))
+#plotting the week averages
+merge_means_line %>%
+  ggplot(aes(x=Week, y=merge_means))+
+  geom_line(linetype="solid")+
+  geom_point(aes(x=Week, y=merge_means), shape = 4) + scale_x_continuous(name = "Week", limits=c(1,9), n.breaks=8) +labs(y= "Mean Stress", x = "Week") + ggtitle("Overall Stress Trend") + coord_cartesian( ylim = c(35, 75))
+
+
+```
+
+```{r High School Graphs}
+#plotting the general stress of high school type
+ggplot(mergeLong, aes(x= TypeofSchool, y = Stress, fill= TypeofSchool)) + 
+  geom_bar(stat = "summary") + ggtitle("Overall Stress Trend by Type of High School") + theme(plot.title = element_text(hjust = 0.5)) + theme(legend.position = "none")
+
+#pivot data wide by type of school
+wideData <- pivot_wider(mergeLong, names_from = TypeofSchool, values_from = Stress)
+
+#plotting traditional public school
+wideDataTrad <- select(wideData, Week, Traditional_Public)
+wideDataTrad<- drop_na(wideDataTrad, Traditional_Public)
+wideDataTrad <- mutate(wideDataTrad, 
+                                 Week = recode(Week, 'Week_1' = "1", 
+                                              'Week_2' = "2",
+                                              'Week_3' = "3", 
+                                              'Week_4' ="4",
+                                              'Week_5' = "5",'Week_6' = "6", 
+                                              'Week_7' = "7",
+                                              'Week_8' = "8"))
+
+#grouping and calculating our data
+wideDataTrad <- mutate(wideDataTrad, Week = as.numeric(Week))
+
+#grouping and calculating our data
+merge_means_line2 <- wideDataTrad %>%
+  group_by(Week) %>%
+  summarise(merge_means2 = mean(Traditional_Public),
+            merge_sds2 = sd(Traditional_Public))
+#plotting the means by week on the x-axis and mean score on the y-axis  
+merge_means_line2 %>%
+  ggplot(aes(x=Week, y=merge_means2))+
+  geom_line(linetype="solid")+
+  geom_point(aes(x=Week, y=merge_means2), shape = 4) + labs(y= "Mean Stress", x = "Week") + ggtitle("Traditional Public School Stress Trend") + theme(plot.title = element_text(hjust = 0.5, size = 25, color = "blue")) + coord_cartesian( ylim = c(35, 85))
+
+
+
+
+#plotting traditional private school
+wideDataPriv <- select(wideData, Week, Private_School)
+wideDataPriv<- drop_na(wideDataPriv, Private_School)
+wideDataPriv <- mutate(wideDataPriv, 
+                                 Week = recode(Week, 'Week_1' = "1", 
+                                              'Week_2' = "2",
+                                              'Week_3' = "3", 
+                                              'Week_4' ="4",
+                                              'Week_5' = "5",'Week_6' = "6", 
+                                              'Week_7' = "7",
+                                              'Week_8' = "8"))
+#grouping and calculating our data
+wideDataPriv <- mutate(wideDataPriv, Week = as.numeric(Week))
+merge_means_line3 <- wideDataPriv %>%
+  group_by(Week) %>%
+  summarise(merge_means3 = mean(Private_School),
+            merge_sds3 = sd(Private_School))
+
+merge_means_line3 %>%
+  ggplot(aes(x=Week, y=merge_means3))+
+  geom_line(linetype="solid")+
+  geom_point(aes(x=Week, y=merge_means3), shape = 4) + labs(y= "Mean Stress", x = "Week") + ggtitle("Private School Stress Trend") + theme(plot.title = element_text(hjust = 0.5, size = 25, color = "blue")) + coord_cartesian( ylim = c(35, 85))
+
+
+
+
+#plotting traditional public magnet
+wideDataMag <- select(wideData, Week, Public_Magnet)
+wideDataMag<- drop_na(wideDataMag, Public_Magnet)
+wideDataMag <- mutate(wideDataMag, 
+                                 Week = recode(Week, 'Week_1' = "1", 
+                                              'Week_2' = "2",
+                                              'Week_3' = "3", 
+                                              'Week_4' ="4",
+                                              'Week_5' = "5",'Week_6' = "6", 
+                                              'Week_7' = "7",
+                                              'Week_8' = "8"))
+#grouping and calculating our data
+wideDataMag <- mutate(wideDataMag, Week = as.numeric(Week))
+merge_means_line4 <- wideDataMag %>%
+  group_by(Week) %>%
+  summarise(merge_means4 = mean(Public_Magnet),
+            merge_sds4 = sd(Public_Magnet))
+#plotting the means by week on the x-axis and mean score on the y-axis  
+merge_means_line4 %>%
+  ggplot(aes(x=Week, y=merge_means4))+
+  geom_line(linetype="solid")+
+  geom_point(aes(x=Week, y=merge_means4), shape = 4) + labs(y= "Mean Stress", x = "Week") + ggtitle("Public Magnet Stress Trend") + theme(plot.title = element_text(hjust = 0.5, size = 25, color = "blue")) + coord_cartesian( ylim = c(35, 85))
+
+
+
+
+#plotting other
+wideDataOth <- select(wideData, Week, Other)
+wideDataOth<- drop_na(wideDataOth, Other)
+wideDataOth <- mutate(wideDataOth, 
+                                 Week = recode(Week, 'Week_1' = "1", 
+                                              'Week_2' = "2",
+                                              'Week_3' = "3", 
+                                              'Week_4' ="4",
+                                              'Week_5' = "5",'Week_6' = "6", 
+                                              'Week_7' = "7",
+                                              'Week_8' = "8"))
+
+#grouping and calculating our data
+wideDataOth <- mutate(wideDataOth, Week = as.numeric(Week))
+merge_means_line5 <- wideDataOth %>%
+  group_by(Week) %>%
+  summarise(merge_means5 = mean(Other),
+            merge_sds5 = sd(Other))
+#plotting the means by week on the x-axis and mean score on the y-axis  
+merge_means_line5 %>%
+  ggplot(aes(x=Week, y=merge_means5))+
+  geom_line(linetype="solid")+
+  geom_point(aes(x=Week, y=merge_means5), shape = 4) + labs(y= "Mean Stress", x = "Week") + ggtitle("Other Stress Trend") + theme(plot.title = element_text(hjust = 0.5, size = 25, color = "blue")) + coord_cartesian( ylim = c(35, 85))
+
+```
+
+## High School Type Graph Notes
+
+>> Looking at the bar chart, we see that students who attended public magnet schools endure the most stress over the course of the semester. This is somewhat close to my hypothesis as I assumed that public school students would feel the most stress. 
+
+>> Exam week is the 5th week of the semester and through comparison of line graphs, we can deduce that students who selected 'other' as their high school type feel the most stress during exam week and students that declared 'public magnet' as their high school type felt the second most stress with traditional public school ranking lowest. This was suprising to me because I assumed that traditional public school students would be much more anxious about to serious exam weeks. 
+
+
+```{r Major Type Graphs}
+#overall stress bar chart
+ggplot(mergeLong, aes(x= Major_Type, y = Stress, fill=Major_Type)) + 
+  geom_bar(stat = "summary") + theme(legend.position = "none", plot.title = element_text(size = 30, color = "blue")) + ggtitle("Overall Stress by Major") + theme(plot.title = element_text(hjust = 0.5)) 
+
+#pivot data wide by major type
+wideData2 <- pivot_wider(mergeLong, names_from = Major_Type, values_from = Stress)
+colnames(wideData2)[which(names(wideData2) == "Science and Social Sciences")] <- "Science_Social_Sciences"
+
+#plotting Social Sciences
+wideDataSS <- select(wideData2, Week, Science_Social_Sciences)
+wideDataSS<- drop_na(wideDataSS, Science_Social_Sciences)
+wideDataSS <- mutate(wideDataSS, 
+                                 Week = recode(Week, 'Week_1' = "1", 
+                                              'Week_2' = "2",
+                                              'Week_3' = "3", 
+                                              'Week_4' ="4",
+                                              'Week_5' = "5",'Week_6' = "6", 
+                                              'Week_7' = "7",
+                                              'Week_8' = "8"))
+
+#grouping and calculating our data
+wideDataSS <- mutate(wideDataSS, Week = as.numeric(Week))
+merge_means_lineSS <- wideDataSS %>%
+  group_by(Week) %>%
+  summarise(merge_meansSS = mean(Science_Social_Sciences),
+            merge_sdsSS = sd(Science_Social_Sciences))
+#plotting the means by week on the x-axis and mean score on the y-axis  
+merge_means_lineSS %>%
+  ggplot(aes(x=Week, y=merge_meansSS))+
+  geom_line(linetype="solid")+
+  geom_point(aes(x=Week, y=merge_meansSS), shape = 4) + labs(y= "Mean Stress", x = "Week") + ggtitle("Science and Social Sciences Stress Trend") + theme(plot.title = element_text(hjust = 0.5, size = 25, color = "blue")) + coord_cartesian( ylim = c(35, 80))
+
+#plotting BUS School
+wideDataBUS <- select(wideData2, Week, CommerceEconPolitics)
+wideDataBUS<- drop_na(wideDataBUS, CommerceEconPolitics)
+wideDataBUS <- mutate(wideDataBUS, 
+                                 Week = recode(Week, 'Week_1' = "1", 
+                                              'Week_2' = "2",
+                                              'Week_3' = "3", 
+                                              'Week_4' ="4",
+                                              'Week_5' = "5",'Week_6' = "6", 
+                                              'Week_7' = "7",
+                                              'Week_8' = "8"))
+
+#grouping and calculating our data
+wideDataBUS <- mutate(wideDataBUS, Week = as.numeric(Week))
+merge_means_lineBUS <- wideDataBUS %>%
+  group_by(Week) %>%
+  summarise(merge_meansBUS = mean(CommerceEconPolitics),
+            merge_sdsBUS = sd(CommerceEconPolitics))
+
+merge_means_lineBUS %>%
+  ggplot(aes(x=Week, y=merge_meansBUS))+
+  geom_line(linetype="solid")+
+  geom_point(aes(x=Week, y=merge_meansBUS), shape = 4) + labs(y= "Mean Stress", x = "Week") + ggtitle("Business School Stress Trend") + theme(plot.title = element_text(hjust = 0.5, size = 25, color = "blue")) + coord_cartesian( ylim = c(35, 80))
+
+
+
+#plotting other major
+wideDataOther <- select(wideData2, Week, Other)
+wideDataOther<- drop_na(wideDataOther, Other)
+wideDataOther <- mutate(wideDataOther, 
+                                 Week = recode(Week, 'Week_1' = "1", 
+                                              'Week_2' = "2",
+                                              'Week_3' = "3", 
+                                              'Week_4' ="4",
+                                              'Week_5' = "5",'Week_6' = "6", 
+                                              'Week_7' = "7",
+                                              'Week_8' = "8"))
+
+#grouping and calculating our data
+wideDataOther <- mutate(wideDataOther, Week = as.numeric(Week))
+merge_means_lineOther <- wideDataOther %>%
+  group_by(Week) %>%
+  summarise(merge_meansOther = mean(Other),
+            merge_sdsOther = sd(Other))
+#plotting the means by week on the x-axis and mean score on the y-axis  
+merge_means_lineOther %>%
+  ggplot(aes(x=Week, y=merge_meansOther))+
+  geom_line(linetype="solid")+
+  geom_point(aes(x=Week, y=merge_meansOther), shape = 4) + labs(y= "Mean Stress", x = "Week") + ggtitle("Other Major Stress Trend") + theme(plot.title = element_text(hjust = 0.5, size = 25, color = "blue")) + coord_cartesian( ylim = c(35, 80))
+
+
+
+#plotting Double Majors
+wideDataDbl <- select(wideData2, Week, Double)
+wideDataDbl<- drop_na(wideDataDbl, Double)
+wideDataDbl <- mutate(wideDataDbl, 
+                                 Week = recode(Week, 'Week_1' = "1", 
+                                              'Week_2' = "2",
+                                              'Week_3' = "3", 
+                                              'Week_4' ="4",
+                                              'Week_5' = "5",'Week_6' = "6", 
+                                              'Week_7' = "7",
+                                              'Week_8' = "8"))
+
+#grouping and calculating our data
+wideDataDbl <- mutate(wideDataDbl, Week = as.numeric(Week))
+merge_means_line5 <- wideDataDbl %>%
+  group_by(Week) %>%
+  summarise(merge_meansDbl = mean(Double),
+            merge_sdsDbl = sd(Double))
+#plotting the means by week on the x-axis and mean score on the y-axis  
+merge_means_line5 %>%
+  ggplot(aes(x=Week, y=merge_meansDbl))+
+  geom_line(linetype="solid")+
+  geom_point(aes(x=Week, y=merge_meansDbl), shape = 4) + labs(y= "Mean Stress", x = "Week") + ggtitle("Double Stress Trend") + theme(plot.title = element_text(hjust = 0.5, size = 25, color = "blue")) + coord_cartesian( ylim = c(35, 80))
+
+```
+
+## Major Type Graph Notes
+
+>> Looking at the bar chart, we see that double majors endure the most stress over the course of the semester. 
+
+>> Exam week is the 5th week of the semester and through comparison of line graphs, we can deduce that double majors feel the most stress during exam week and students that declared 'other' as their major type had the lowest level of stress. 
+
+
+## Overall Visualization Notes
+
+>> It can be hard to compare the different line graphs when they are not on the same plot but keeping them seperate allowed me to keep as many data entries as possible. For example, if a particular student ID didn't fill out their stress level for every week, we can't generally use the drop_na function because we would be stuck with only 4 rows of perfectly consistent data amongst high school type and major type data. Thus, by creating subsets for each major type/high school type we can utilize all of the data values at our disposal. To stay consistent between graphs and to allow for easier comprehension, I standardized the y-axis range. Lastly, I think that the bar chart visualizations that represent the overall stress of each group (major or high school) are helpful to further interpret the line graphs and see the long term difference rather than week by week. 
+
+```{r ANOVA}
+#anova for type of school
+rm_anovaSchool <- aov(Stress~TypeofSchool + Error(ID), data=mergeLong)
+summary(rm_anovaSchool)
+
+#anova for major
+rm_anovaMajor <- aov(Stress~Major_Type + Error(ID), data=mergeLong)
+summary(rm_anovaMajor)
+
+```
+
+## ANOVA Analysis 
+
+>> By looking at the output of our first anova table (type of school), we see that there is a very small p-value of 0.003. This means that we have strong evidence to reject the null hypothesis that there is no difference in the mean stress levels between type of high school background. 
+
+>> Similarly, the anova table for the analysis of stress and major type, we have a large p-value of 0.318 meaning we do not have strong evidence to reject our null hypothesis of no difference in mean stress level between types of majors. 
+
+```{r writing to a new file, include=FALSE}
+#writing stored data files
+mergedDataSubset <- write.csv(mergedDataSubset, "CleanedData")
+wideDataHSType <- write.csv(wideData, "WideDataHSType")
+wideDataMajorType <- write.csv(wideData2, "WideDataMajorType")
+
+```
+
