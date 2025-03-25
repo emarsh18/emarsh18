@@ -16,7 +16,7 @@ I am a senior at Washington and Lee University majoring in Mathematics and minor
   - R-Studio
   - Lecture based with supplemental lab assignments and cumulative project 
   - Topics: longitudinal data, data wrangling, statistical analyses, handling/manging data, identifying trends in data
-  - [View Project](CBSC 185 - FINAL PROJECT CODE)
+  - [View Project](/CBSC 185 - FINAL PROJECT CODE)
 - MATH 310 - Mathematical Statistics
   - R-Studio/R-Markdown
   - Lecture based with supplemental lab assignments 
