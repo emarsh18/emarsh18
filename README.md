@@ -16,7 +16,7 @@ I am a senior at Washington and Lee University majoring in Mathematics and minor
   - R-Studio
   - Lecture based with supplemental lab assignments and cumulative project 
   - Topics: longitudinal data, data wrangling, statistical analyses, handling/manging data, identifying trends in data
-  - [View Project Code](#CBSC_185_FP)
+  - Project code available in repository
 - MATH 310 - Mathematical Statistics
   - R-Studio/R-Markdown
   - Lecture based with supplemental lab assignments 
@@ -25,12 +25,12 @@ I am a senior at Washington and Lee University majoring in Mathematics and minor
   - Lecture based with small lab assignemnts and a cumulative final project 
   - R-Studio
   - Topics: linear regression modeling, network mapping, mathematical concepts supporting a regression equation, and the applications of these topics
-  - [View Project Code](#SOAN_244_FP)
+  - Project code available in repository
 - BUS 202 - Fundamentals of Business Analytics
   - Lecture based with supplemental code assignments and a cummulative final project 
   - Python/VS Code
   - Topics: descriptive statistics, data visualizations, basics of the pandas package in Python
-  - Project Code Available
+  - Project code available in repository
 
 
 Thank you for visiting my profile! Have a great day! 😊
