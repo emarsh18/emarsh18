@@ -1,6 +1,6 @@
 ## Hello, I'm Elizabeth Marshall
 
-I am a senior at Washington and Lee University majoring in Mathematics and minoring in Data Science. This profile outlines my relevant coursework and projects that have impacted my minor. 
+I am a senior at Washington and Lee University majoring in Mathematics and minoring in Data Science. This profile outlines my relevant coursework and projects that have contributed to my minor. 
 
 ## A Math Based Data Science Minor - Relevant Classwork and Projects
 
